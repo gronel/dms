@@ -1,0 +1,65 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+class Folder extends Model
+{
+    use SoftDeletes;
+
+    protected $fillable = [
+        'parent_id',
+        'owner_id',
+        'name',
+    ];
+
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(Folder::class, 'parent_id');
+    }
+
+    public function children(): HasMany
+    {
+        return $this->hasMany(Folder::class, 'parent_id');
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(Document::class);
+    }
+
+    public function auditLogs(): MorphMany
+    {
+        return $this->morphMany(AuditLog::class, 'auditable')->orderByDesc('created_at');
+    }
+
+    /**
+     * Build a breadcrumb-style path string: "Parent / Child / Name"
+     */
+    public function getFullPathAttribute(): string
+    {
+        $parts = [$this->name];
+        $folder = $this;
+
+        while ($folder->parent_id !== null) {
+            $folder = $folder->parent()->withTrashed()->first();
+            if ($folder) {
+                array_unshift($parts, $folder->name);
+            } else {
+                break;
+            }
+        }
+
+        return implode(' / ', $parts);
+    }
+}
