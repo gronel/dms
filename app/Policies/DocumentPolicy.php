@@ -10,6 +10,11 @@ class DocumentPolicy
 {
     public function view(User $user, Document $document): bool
     {
+        // Published documents are visible to all authenticated users
+        if ($document->status === 'published') {
+            return true;
+        }
+
         if ($document->owner_id === $user->id) {
             return true;
         }
@@ -19,6 +24,11 @@ class DocumentPolicy
 
     public function download(User $user, Document $document): bool
     {
+        // Published documents are downloadable by all authenticated users
+        if ($document->status === 'published') {
+            return true;
+        }
+
         if ($document->owner_id === $user->id) {
             return true;
         }

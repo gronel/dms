@@ -12,7 +12,8 @@ use Inertia\Response;
 class SearchController extends Controller
 {
     /**
-     * Full-text search across documents the authenticated user owns.
+     * Full-text search across documents the authenticated user owns
+     * plus all published documents from any user.
      *
      * Query params:
      *   q          – search query (required, min 1 char)
@@ -41,8 +42,14 @@ class SearchController extends Controller
         // Build the Scout search — fall back to Eloquent when query is blank
         // so the page still works before Meilisearch is set up.
         if ($query !== '') {
+            // Scout search: own documents OR any published document
             $builder = Document::search($query)
-                ->where('owner_id', $request->user()->id);
+                ->query(function ($q) use ($request) {
+                    $q->where(fn ($q2) => $q2
+                        ->where('owner_id', $request->user()->id)
+                        ->orWhere('status', 'published')
+                    )->with('currentVersion', 'tags', 'owner', 'folder');
+                });
 
             if ($status) {
                 $builder->where('status', $status);
@@ -64,13 +71,14 @@ class SearchController extends Controller
                 default      => null,  // default Meilisearch relevance
             };
 
-            $paginator = $builder->query(function ($q) {
-                $q->with('currentVersion', 'tags', 'owner', 'folder');
-            })->paginate($perPage)->withQueryString();
+            $paginator = $builder->paginate($perPage)->withQueryString();
         } else {
             // Empty query — show recent documents
             $eloquentQuery = Document::query()
-                ->where('owner_id', $request->user()->id)
+                ->where(fn ($q) => $q
+                    ->where('owner_id', $request->user()->id)
+                    ->orWhere('status', 'published')
+                )
                 ->with('currentVersion', 'tags', 'owner', 'folder')
                 ->withoutTrashed();
 

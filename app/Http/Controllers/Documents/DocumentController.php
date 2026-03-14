@@ -22,8 +22,13 @@ class DocumentController extends Controller
 {
     public function index(Request $request): Response
     {
+        $userId = $request->user()->id;
+
         $documents = Document::query()
-            ->where('owner_id', $request->user()->id)
+            ->where(fn ($q) => $q
+                ->where('owner_id', $userId)
+                ->orWhere('status', 'published')
+            )
             ->whereNull('folder_id')
             ->with('currentVersion', 'owner')
             ->withoutTrashed()
@@ -31,7 +36,7 @@ class DocumentController extends Controller
             ->get();
 
         $folders = Folder::query()
-            ->where('owner_id', $request->user()->id)
+            ->where('owner_id', $userId)
             ->whereNull('parent_id')
             ->withCount('documents')
             ->orderBy('name')
